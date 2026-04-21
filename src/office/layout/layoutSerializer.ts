@@ -233,6 +233,12 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
   // Index all furniture tiles by type (for workstation-kind inference)
   const tileTypeIndex = buildFurnitureTileIndex(furniture);
 
+  // Tile -> workstation kind (pre-computed for fast facing inference).
+  const workstationTiles = new Set<string>();
+  for (const [key, type] of tileTypeIndex) {
+    if (furnitureTypeToWorkstationKind(type)) workstationTiles.add(key);
+  }
+
   const dirs: Array<{ dc: number; dr: number; facing: Direction }> = [
     { dc: 0, dr: -1, facing: Direction.UP }, // desk is above chair → face UP
     { dc: 0, dr: 1, facing: Direction.DOWN }, // desk is below chair → face DOWN
@@ -255,15 +261,30 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
         // Determine facing direction:
         // 1) Chair orientation takes priority
         // 2) Adjacent desk direction
-        // 3) Default forward (DOWN)
+        // 3) Any adjacent workstation-bearing furniture (whiteboard/bookshelf/pc/cooler/lamp)
+        // 4) Default forward (DOWN)
         let facingDir: Direction = Direction.DOWN;
         if (entry.orientation) {
           facingDir = orientationToFacing(entry.orientation);
         } else {
+          let matched = false;
           for (const d of dirs) {
             if (deskTiles.has(`${tileCol + d.dc},${tileRow + d.dr}`)) {
               facingDir = d.facing;
+              matched = true;
               break;
+            }
+          }
+          if (!matched) {
+            // Look up to 3 tiles away in each cardinal direction for
+            // any non-desk workstation (whiteboard/bookshelf/pc/cooler/lamp).
+            outer: for (let step = 1; step <= 3; step++) {
+              for (const d of dirs) {
+                if (workstationTiles.has(`${tileCol + d.dc * step},${tileRow + d.dr * step}`)) {
+                  facingDir = d.facing;
+                  break outer;
+                }
+              }
             }
           }
         }
@@ -358,24 +379,24 @@ export function createDefaultLayout(): OfficeLayout {
   const furniture: PlacedFurniture[] = [
     // Workroom — left
     { uid: 'desk-left', type: FurnitureType.DESK, col: 4, row: 3 },
-    { uid: 'bookshelf-1', type: FurnitureType.BOOKSHELF, col: 1, row: 5 },
     { uid: 'whiteboard-1', type: FurnitureType.WHITEBOARD, col: 4, row: 0 },
+    { uid: 'bookshelf-1', type: FurnitureType.BOOKSHELF, col: 1, row: 5 },
     { uid: 'pc-1', type: FurnitureType.PC, col: 8, row: 5 },
     { uid: 'plant-left', type: FurnitureType.PLANT, col: 1, row: 1 },
-    // Workroom chairs — each one tagged by the furniture it faces
-    { uid: 'chair-desk-top', type: FurnitureType.CHAIR, col: 4, row: 2 }, // face UP → whiteboard
-    { uid: 'chair-desk-left', type: FurnitureType.CHAIR, col: 3, row: 4 }, // face LEFT → (wall) falls back to desk
-    { uid: 'chair-desk-right', type: FurnitureType.CHAIR, col: 6, row: 3 }, // face LEFT → desk
-    { uid: 'chair-shelf', type: FurnitureType.CHAIR, col: 2, row: 5 }, // face LEFT → bookshelf
-    { uid: 'chair-pc', type: FurnitureType.CHAIR, col: 8, row: 7 }, // face UP → pc
+    // Workroom chairs — tagged by the nearest non-desk workstation they can face
+    { uid: 'chair-whiteboard', type: FurnitureType.CHAIR, col: 5, row: 1 }, // face UP → whiteboard (THINKING)
+    { uid: 'chair-desk-left', type: FurnitureType.CHAIR, col: 3, row: 4 }, // face RIGHT → desk (CODING)
+    { uid: 'chair-desk-right', type: FurnitureType.CHAIR, col: 6, row: 3 }, // face LEFT → desk (CODING)
+    { uid: 'chair-shelf', type: FurnitureType.CHAIR, col: 2, row: 5 }, // face LEFT → bookshelf (MEMORY)
+    { uid: 'chair-pc', type: FurnitureType.CHAIR, col: 8, row: 7 }, // face UP → pc (BROWSING/EXEC)
 
     // Lounge — right
     { uid: 'cooler-1', type: FurnitureType.COOLER, col: 17, row: 7 },
     { uid: 'lamp-1', type: FurnitureType.LAMP, col: 12, row: 8 },
     { uid: 'plant-right', type: FurnitureType.PLANT, col: 18, row: 1 },
-    { uid: 'chair-sofa-1', type: FurnitureType.CHAIR, col: 16, row: 7 }, // face RIGHT → cooler
-    { uid: 'chair-sofa-2', type: FurnitureType.CHAIR, col: 16, row: 8 }, // face RIGHT → cooler
-    { uid: 'chair-bed', type: FurnitureType.CHAIR, col: 12, row: 7 }, // face DOWN → lamp
+    { uid: 'chair-sofa-1', type: FurnitureType.CHAIR, col: 16, row: 7 }, // face RIGHT → cooler (RESTING)
+    { uid: 'chair-sofa-2', type: FurnitureType.CHAIR, col: 17, row: 8 }, // face UP → cooler (RESTING)
+    { uid: 'chair-bed', type: FurnitureType.CHAIR, col: 12, row: 7 }, // face DOWN → lamp (SLEEPING)
   ];
 
   return { version: 1, cols: DEFAULT_COLS, rows: DEFAULT_ROWS, tiles, tileColors, furniture };
