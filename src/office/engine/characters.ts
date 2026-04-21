@@ -14,12 +14,27 @@ import type { CharacterSprites } from '../sprites/spriteData.js';
 import type { Character, Seat, SpriteData, TileType as TileTypeVal } from '../types.js';
 import { CharacterState, Direction, TILE_SIZE } from '../types.js';
 
-/** Tools that show reading animation instead of typing */
-const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch']);
+/** Tools that show reading animation instead of typing (case-insensitive match). */
+const READING_TOOL_KEYS = new Set([
+  'read',
+  'grep',
+  'glob',
+  'webfetch',
+  'websearch',
+  'web_fetch',
+  'web_search',
+  'memory_search',
+  'memory_get',
+]);
 
 export function isReadingTool(tool: string | null): boolean {
   if (!tool) return false;
-  return READING_TOOLS.has(tool);
+  return READING_TOOL_KEYS.has(tool.toLowerCase());
+}
+
+/** Effective target seat: prefer the seat picked for the current intent, else the home seat. */
+export function effectiveSeatId(ch: Character): string | null {
+  return ch.intentSeatId ?? ch.seatId ?? null;
 }
 
 /** Pixel center of a tile */
@@ -123,16 +138,18 @@ export function updateCharacter(
       // No idle animation — static pose
       ch.frame = 0;
       if (ch.seatTimer < 0) ch.seatTimer = 0; // clear turn-end sentinel
-      // If became active, pathfind to seat
-      if (ch.isActive) {
-        if (!ch.seatId) {
+      // If became active OR an intent seat is set (e.g. RESTING/SLEEPING), pathfind there.
+      const targetSeatId = effectiveSeatId(ch);
+      const shouldWalkToSeat = ch.isActive || (ch.intentSeatId != null);
+      if (shouldWalkToSeat) {
+        if (!targetSeatId) {
           // No seat assigned — type in place
           ch.state = CharacterState.TYPE;
           ch.frame = 0;
           ch.frameTimer = 0;
           break;
         }
-        const seat = seats.get(ch.seatId);
+        const seat = seats.get(targetSeatId);
         if (seat) {
           const path = findPath(
             ch.tileCol,
@@ -162,8 +179,9 @@ export function updateCharacter(
       ch.wanderTimer -= dt;
       if (ch.wanderTimer <= 0) {
         // Check if we've wandered enough — return to seat for a rest
-        if (ch.wanderCount >= ch.wanderLimit && ch.seatId) {
-          const seat = seats.get(ch.seatId);
+        const restSeatId = effectiveSeatId(ch);
+        if (ch.wanderCount >= ch.wanderLimit && restSeatId) {
+          const seat = seats.get(restSeatId);
           if (seat) {
             const path = findPath(
               ch.tileCol,
@@ -220,12 +238,13 @@ export function updateCharacter(
         ch.x = center.x;
         ch.y = center.y;
 
-        if (ch.isActive) {
-          if (!ch.seatId) {
+        if (ch.isActive || ch.intentSeatId != null) {
+          const walkSeatId = effectiveSeatId(ch);
+          if (!walkSeatId) {
             // No seat — type in place
             ch.state = CharacterState.TYPE;
           } else {
-            const seat = seats.get(ch.seatId);
+            const seat = seats.get(walkSeatId);
             if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
               ch.state = CharacterState.TYPE;
               ch.dir = seat.facingDir;
@@ -235,8 +254,9 @@ export function updateCharacter(
           }
         } else {
           // Check if arrived at assigned seat — sit down for a rest before wandering again
-          if (ch.seatId) {
-            const seat = seats.get(ch.seatId);
+          const restId = effectiveSeatId(ch);
+          if (restId) {
+            const seat = seats.get(restId);
             if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
               ch.state = CharacterState.TYPE;
               ch.dir = seat.facingDir;
@@ -287,9 +307,10 @@ export function updateCharacter(
         ch.moveProgress = 0;
       }
 
-      // If became active while wandering, repath to seat
-      if (ch.isActive && ch.seatId) {
-        const seat = seats.get(ch.seatId);
+      // If became active (or intent changed), repath to the effective target seat
+      const repathSeatId = effectiveSeatId(ch);
+      if ((ch.isActive || ch.intentSeatId != null) && repathSeatId) {
+        const seat = seats.get(repathSeatId);
         if (seat) {
           const lastStep = ch.path[ch.path.length - 1];
           if (!lastStep || lastStep.col !== seat.seatCol || lastStep.row !== seat.seatRow) {

@@ -41,6 +41,18 @@ export const CharacterState = {
 } as const;
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState];
 
+// Re-export from intent.ts so downstream code can import from types.js
+export {
+  AgentIntent,
+  WorkstationKind,
+  IDLE_TO_REST_SEC,
+  REST_TO_SLEEP_SEC,
+  toolNameToIntent,
+  intentToWorkstationKind,
+  fallbackKinds,
+} from './engine/intent.js';
+import type { AgentIntent, WorkstationKind } from './engine/intent.js';
+
 export const Direction = {
   DOWN: 0,
   LEFT: 1,
@@ -62,6 +74,8 @@ export interface Seat {
   /** Direction character faces when sitting (toward adjacent desk) */
   facingDir: Direction;
   assigned: boolean;
+  /** What kind of workstation this seat serves (inferred from adjacent furniture). Default 'desk'. */
+  workstationKind?: WorkstationKind;
 }
 
 export interface FurnitureInstance {
@@ -195,4 +209,10 @@ export interface Character {
   matrixEffectSeeds: number[];
   /** Workspace folder name (only set for multi-root workspaces) */
   folderName?: string;
+  /** Current semantic intent (driven by tool activity / idle time). */
+  currentIntent?: AgentIntent;
+  /** Seat picked for the current intent; falls back to seatId when null. */
+  intentSeatId?: string | null;
+  /** Seconds the agent has been idle (active=false). Reset when becomes active. */
+  idleSinceSec?: number;
 }

@@ -90,9 +90,9 @@ export class SessionWatcher {
   }
 
   /** Get current state of all agents for initial sync */
-  getAgentStates(): Array<{ id: number; config: AgentConfig; isActive: boolean; isStalled: boolean; currentTask: string; channel: string; lastChatMessage: string; tools: Array<{ toolId: string; status: string }> }> {
+  getAgentStates(): Array<{ id: number; config: AgentConfig; isActive: boolean; isStalled: boolean; currentTask: string; channel: string; lastChatMessage: string; tools: Array<{ toolId: string; status: string; toolName: string }> }> {
     const now = Date.now();
-    const states: Array<{ id: number; config: AgentConfig; isActive: boolean; isStalled: boolean; currentTask: string; channel: string; lastChatMessage: string; tools: Array<{ toolId: string; status: string }> }> = [];
+    const states: Array<{ id: number; config: AgentConfig; isActive: boolean; isStalled: boolean; currentTask: string; channel: string; lastChatMessage: string; tools: Array<{ toolId: string; status: string; toolName: string }> }> = [];
 
     for (const agent of this.agents) {
       const id = this.agentIdMap.get(agent.agentDir)!;
@@ -101,7 +101,7 @@ export class SessionWatcher {
       let currentTask = '';
       let channel = '';
       let lastChatMessage = '';
-      const tools: Array<{ toolId: string; status: string }> = [];
+      const tools: Array<{ toolId: string; status: string; toolName: string }> = [];
 
       // Find the most recent active session for this agent
       let latestActivity = 0;
@@ -129,7 +129,8 @@ export class SessionWatcher {
           if (!session.state.isIdle) {
             isActive = true;
             for (const [toolId, status] of session.state.activeToolStatuses) {
-              tools.push({ toolId, status });
+              const toolName = session.state.activeToolNames.get(toolId) ?? '';
+              tools.push({ toolId, status, toolName });
             }
           }
           if (session.state.isStalled) {

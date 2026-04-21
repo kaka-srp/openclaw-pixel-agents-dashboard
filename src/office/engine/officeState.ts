@@ -12,6 +12,15 @@ import {
   PALETTE_COUNT,
   WAITING_BUBBLE_DURATION_SEC,
 } from '../../constants.js';
+import {
+  AgentIntent,
+  fallbackKinds,
+  IDLE_TO_REST_SEC,
+  intentToWorkstationKind,
+  REST_TO_SLEEP_SEC,
+  toolNameToIntent,
+  WorkstationKind,
+} from './intent.js';
 import { getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog.js';
 import {
   createDefaultLayout,
@@ -86,6 +95,13 @@ export class OfficeState {
     // Reassign characters to new seats, preserving existing assignments when possible
     for (const seat of this.seats.values()) {
       seat.assigned = false;
+    }
+
+    // Clear any stale intent-seat assignments (they'll be re-picked on next intent event)
+    for (const ch of this.characters.values()) {
+      if (ch.intentSeatId && !this.seats.has(ch.intentSeatId)) {
+        ch.intentSeatId = null;
+      }
     }
 
     // First pass: try to keep characters at their existing seats
@@ -523,6 +539,16 @@ export class OfficeState {
         ch.seatTimer = -1;
         ch.path = [];
         ch.moveProgress = 0;
+        // Release any intent seat so the idle FSM can route to sofa/bed.
+        if (ch.intentSeatId && ch.intentSeatId !== ch.seatId) {
+          const prev = this.seats.get(ch.intentSeatId);
+          if (prev) prev.assigned = false;
+        }
+        ch.intentSeatId = null;
+        ch.currentIntent = undefined;
+        ch.idleSinceSec = 0;
+      } else {
+        ch.idleSinceSec = undefined;
       }
       this.rebuildFurnitureInstances();
     }
@@ -591,9 +617,61 @@ export class OfficeState {
 
   setAgentTool(id: number, tool: string | null): void {
     const ch = this.characters.get(id);
-    if (ch) {
-      ch.currentTool = tool;
+    if (!ch) return;
+    ch.currentTool = tool;
+    // Derive intent from tool name and route agent to the right workstation.
+    if (tool) {
+      const intent = toolNameToIntent(tool);
+      this.setAgentIntent(id, intent);
     }
+  }
+
+  /** Pick the first free seat matching `kind`, excluding a seat the agent already occupies. */
+  private pickSeatOfKind(kind: WorkstationKind, excludeSeatId: string | null): string | null {
+    for (const [uid, seat] of this.seats) {
+      if (seat.assigned && uid !== excludeSeatId) continue;
+      if ((seat.workstationKind ?? WorkstationKind.DESK) === kind) return uid;
+    }
+    return null;
+  }
+
+  /** Pick a seat for an intent, trying the primary kind then fallbacks. */
+  private pickSeatForIntent(intent: AgentIntent, excludeSeatId: string | null): string | null {
+    const primary = intentToWorkstationKind(intent);
+    const direct = this.pickSeatOfKind(primary, excludeSeatId);
+    if (direct) return direct;
+    for (const fallback of fallbackKinds(primary)) {
+      const seat = this.pickSeatOfKind(fallback, excludeSeatId);
+      if (seat) return seat;
+    }
+    return null;
+  }
+
+  /**
+   * Route an agent to the workstation for the given intent.
+   * Releases the previous intent seat (if any) and assigns a new one.
+   * Character FSM picks up the new `intentSeatId` on the next update tick.
+   */
+  setAgentIntent(id: number, intent: AgentIntent): void {
+    const ch = this.characters.get(id);
+    if (!ch) return;
+    if (ch.currentIntent === intent && ch.intentSeatId) return; // no-op
+
+    // Release the previous intent seat (if different from the home seat)
+    if (ch.intentSeatId && ch.intentSeatId !== ch.seatId) {
+      const prev = this.seats.get(ch.intentSeatId);
+      if (prev) prev.assigned = false;
+    }
+
+    const newSeatId = this.pickSeatForIntent(intent, ch.seatId);
+    ch.currentIntent = intent;
+    ch.intentSeatId = newSeatId;
+
+    if (newSeatId && newSeatId !== ch.seatId) {
+      const seat = this.seats.get(newSeatId);
+      if (seat) seat.assigned = true;
+    }
+    this.rebuildFurnitureInstances();
   }
 
   showPermissionBubble(id: number): void {
@@ -635,6 +713,26 @@ export class OfficeState {
 
   update(dt: number): void {
     const toDelete: number[] = [];
+    // ── Idle-timer → resting/sleeping intent routing ─────────────
+    // When the agent has been inactive for IDLE_TO_REST_SEC, send them to the sofa.
+    // After REST_TO_SLEEP_SEC more, send them to the bed.
+    for (const ch of this.characters.values()) {
+      if (ch.isActive || ch.matrixEffect) continue;
+      ch.idleSinceSec = (ch.idleSinceSec ?? 0) + dt;
+      if (
+        ch.idleSinceSec >= IDLE_TO_REST_SEC + REST_TO_SLEEP_SEC &&
+        ch.currentIntent !== AgentIntent.SLEEPING
+      ) {
+        this.setAgentIntent(ch.id, AgentIntent.SLEEPING);
+      } else if (
+        ch.idleSinceSec >= IDLE_TO_REST_SEC &&
+        ch.currentIntent !== AgentIntent.RESTING &&
+        ch.currentIntent !== AgentIntent.SLEEPING
+      ) {
+        this.setAgentIntent(ch.id, AgentIntent.RESTING);
+      }
+    }
+
     for (const ch of this.characters.values()) {
       // Handle matrix effect animation
       if (ch.matrixEffect) {

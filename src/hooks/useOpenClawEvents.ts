@@ -205,10 +205,11 @@ export function useOpenClawEvents(
             if (agent.isActive) {
               os.setAgentActive(agent.id, true);
 
-              // Restore active tools
+              // Restore active tools — prefer raw toolName (drives intent routing)
               for (const tool of agent.tools) {
-                const toolName = extractToolName(tool.status);
-                os.setAgentTool(agent.id, toolName);
+                const rawToolName = (tool as { toolName?: string }).toolName
+                  || extractToolName(tool.status);
+                os.setAgentTool(agent.id, rawToolName);
               }
             }
           }
@@ -271,6 +272,9 @@ export function useOpenClawEvents(
         const id = msg.id as number;
         const toolId = msg.toolId as string;
         const status = msg.status as string;
+        // Raw tool name from the server (used for intent routing).
+        // Fallback: extractToolName(status) maps to 'read'/'write' for legacy payloads.
+        const rawToolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         pushHeatEvent(id);
 
         setAgentTools(prev => {
@@ -285,8 +289,7 @@ export function useOpenClawEvents(
           os.addAgent(id, cfg?.palette, cfg?.hueShift);
         }
 
-        const toolName = extractToolName(status);
-        os.setAgentTool(id, toolName);
+        os.setAgentTool(id, rawToolName);
         os.setAgentActive(id, true);
 
       } else if (msg.type === 'agentToolDone') {

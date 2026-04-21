@@ -6,6 +6,7 @@ import type {
   PlacedFurniture,
   Seat,
   TileType as TileTypeVal,
+  WorkstationKind,
 } from '../types.js';
 import {
   DEFAULT_COLS,
@@ -14,6 +15,7 @@ import {
   FurnitureType,
   TILE_SIZE,
   TileType,
+  WorkstationKind as Wk,
 } from '../types.js';
 import { getCatalogEntry } from './furnitureCatalog.js';
 
@@ -155,6 +157,62 @@ function orientationToFacing(orientation: string): Direction {
   }
 }
 
+/** Map a furniture type to the workstation kind a chair facing it belongs to. */
+function furnitureTypeToWorkstationKind(type: string): WorkstationKind | null {
+  switch (type) {
+    case FurnitureType.WHITEBOARD:
+      return Wk.WHITEBOARD;
+    case FurnitureType.BOOKSHELF:
+      return Wk.BOOKSHELF;
+    case FurnitureType.COOLER:
+      return Wk.SOFA; // temporary: cooler stands in for sofa (rest)
+    case FurnitureType.PC:
+      return Wk.BROWSER;
+    case FurnitureType.LAMP:
+      return Wk.BED; // temporary: lamp stands in for bed (sleep)
+    case FurnitureType.DESK:
+      return Wk.DESK;
+    default:
+      return null;
+  }
+}
+
+/** Index all furniture tiles by type, so chair-facing lookups know which kind they hit. */
+function buildFurnitureTileIndex(
+  furniture: PlacedFurniture[],
+): Map<string, string /* furnitureType */> {
+  const index = new Map<string, string>();
+  for (const item of furniture) {
+    const entry = getCatalogEntry(item.type);
+    if (!entry) continue;
+    for (let dr = 0; dr < entry.footprintH; dr++) {
+      for (let dc = 0; dc < entry.footprintW; dc++) {
+        index.set(`${item.col + dc},${item.row + dr}`, item.type);
+      }
+    }
+  }
+  return index;
+}
+
+/** Scan up to 3 tiles along a direction from a chair; return the kind of the first furniture hit. */
+function inferWorkstationKindByScan(
+  col: number,
+  row: number,
+  facing: Direction,
+  tileTypeIndex: Map<string, string>,
+): WorkstationKind | null {
+  const dc = facing === Direction.LEFT ? -1 : facing === Direction.RIGHT ? 1 : 0;
+  const dr = facing === Direction.UP ? -1 : facing === Direction.DOWN ? 1 : 0;
+  for (let step = 1; step <= 3; step++) {
+    const key = `${col + dc * step},${row + dr * step}`;
+    const type = tileTypeIndex.get(key);
+    if (!type) continue;
+    const kind = furnitureTypeToWorkstationKind(type);
+    if (kind) return kind;
+  }
+  return null;
+}
+
 /** Generate seats from chair furniture.
  *  Facing priority: 1) chair orientation, 2) adjacent desk, 3) forward (DOWN). */
 export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
@@ -171,6 +229,9 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
       }
     }
   }
+
+  // Index all furniture tiles by type (for workstation-kind inference)
+  const tileTypeIndex = buildFurnitureTileIndex(furniture);
 
   const dirs: Array<{ dc: number; dr: number; facing: Direction }> = [
     { dc: 0, dr: -1, facing: Direction.UP }, // desk is above chair → face UP
@@ -209,12 +270,16 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
 
         // First seat uses chair uid (backward compat), subsequent use uid:N
         const seatUid = seatCount === 0 ? item.uid : `${item.uid}:${seatCount}`;
+        // Infer workstation kind from what the chair is facing
+        const workstationKind =
+          inferWorkstationKindByScan(tileCol, tileRow, facingDir, tileTypeIndex) ?? Wk.DESK;
         seats.set(seatUid, {
           uid: seatUid,
           seatCol: tileCol,
           seatRow: tileRow,
           facingDir,
           assigned: false,
+          workstationKind,
         });
         seatCount++;
       }
@@ -287,24 +352,30 @@ export function createDefaultLayout(): OfficeLayout {
     }
   }
 
+  // Default layout split into:
+  //   Left room  (c 1-9)   = WORKROOM   (desk / whiteboard / bookshelf / pc)
+  //   Right room (c 11-18) = LOUNGE     (cooler / lamp) — temporary stand-ins for sofa/bed
   const furniture: PlacedFurniture[] = [
+    // Workroom — left
     { uid: 'desk-left', type: FurnitureType.DESK, col: 4, row: 3 },
-    { uid: 'desk-right', type: FurnitureType.DESK, col: 13, row: 3 },
     { uid: 'bookshelf-1', type: FurnitureType.BOOKSHELF, col: 1, row: 5 },
+    { uid: 'whiteboard-1', type: FurnitureType.WHITEBOARD, col: 4, row: 0 },
+    { uid: 'pc-1', type: FurnitureType.PC, col: 8, row: 5 },
     { uid: 'plant-left', type: FurnitureType.PLANT, col: 1, row: 1 },
+    // Workroom chairs — each one tagged by the furniture it faces
+    { uid: 'chair-desk-top', type: FurnitureType.CHAIR, col: 4, row: 2 }, // face UP → whiteboard
+    { uid: 'chair-desk-left', type: FurnitureType.CHAIR, col: 3, row: 4 }, // face LEFT → (wall) falls back to desk
+    { uid: 'chair-desk-right', type: FurnitureType.CHAIR, col: 6, row: 3 }, // face LEFT → desk
+    { uid: 'chair-shelf', type: FurnitureType.CHAIR, col: 2, row: 5 }, // face LEFT → bookshelf
+    { uid: 'chair-pc', type: FurnitureType.CHAIR, col: 8, row: 7 }, // face UP → pc
+
+    // Lounge — right
     { uid: 'cooler-1', type: FurnitureType.COOLER, col: 17, row: 7 },
+    { uid: 'lamp-1', type: FurnitureType.LAMP, col: 12, row: 8 },
     { uid: 'plant-right', type: FurnitureType.PLANT, col: 18, row: 1 },
-    { uid: 'whiteboard-1', type: FurnitureType.WHITEBOARD, col: 15, row: 0 },
-    // Left desk chairs
-    { uid: 'chair-l-top', type: FurnitureType.CHAIR, col: 4, row: 2 },
-    { uid: 'chair-l-bottom', type: FurnitureType.CHAIR, col: 5, row: 5 },
-    { uid: 'chair-l-left', type: FurnitureType.CHAIR, col: 3, row: 4 },
-    { uid: 'chair-l-right', type: FurnitureType.CHAIR, col: 6, row: 3 },
-    // Right desk chairs
-    { uid: 'chair-r-top', type: FurnitureType.CHAIR, col: 13, row: 2 },
-    { uid: 'chair-r-bottom', type: FurnitureType.CHAIR, col: 14, row: 5 },
-    { uid: 'chair-r-left', type: FurnitureType.CHAIR, col: 12, row: 4 },
-    { uid: 'chair-r-right', type: FurnitureType.CHAIR, col: 15, row: 3 },
+    { uid: 'chair-sofa-1', type: FurnitureType.CHAIR, col: 16, row: 7 }, // face RIGHT → cooler
+    { uid: 'chair-sofa-2', type: FurnitureType.CHAIR, col: 16, row: 8 }, // face RIGHT → cooler
+    { uid: 'chair-bed', type: FurnitureType.CHAIR, col: 12, row: 7 }, // face DOWN → lamp
   ];
 
   return { version: 1, cols: DEFAULT_COLS, rows: DEFAULT_ROWS, tiles, tileColors, furniture };

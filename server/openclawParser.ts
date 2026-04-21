@@ -221,6 +221,7 @@ export function parseOpenClawLine(
                 id: agentId,
                 toolId: block.id,
                 status,
+                toolName,
               });
 
               // Detect sub-agent spawns
