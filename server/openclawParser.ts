@@ -127,6 +127,50 @@ function extractTaskFromUserMessage(content: unknown): string {
   return cleaned || '';
 }
 
+/**
+ * Detect OpenClaw heartbeat loops — periodic system messages whose sole purpose
+ * is liveness checking. These must NOT mark the agent as "active" or they will
+ * keep the character in a perpetual "thinking" state.
+ *
+ * Heartbeat user messages look like:
+ *   "System (untrusted): [2026-04-21 19:57:55 GMT+8] ..."
+ * Heartbeat assistant replies are literal tokens: HEARTBEAT_OK / NO_REPLY /
+ * ANNOUNCE_SKIP / REPLY_SKIP.
+ */
+const HEARTBEAT_ASSISTANT_TOKENS = new Set([
+  'HEARTBEAT_OK',
+  'NO_REPLY',
+  'ANNOUNCE_SKIP',
+  'REPLY_SKIP',
+]);
+
+const HEARTBEAT_USER_PREFIX_PATTERNS = [
+  /^System \(untrusted\):\s*\[\d{4}-\d{2}-\d{2} /,
+  /^\[Inter-session heartbeat\]/i,
+];
+
+export function isHeartbeatUserContent(content: unknown): boolean {
+  let text = '';
+  if (typeof content === 'string') {
+    text = content;
+  } else if (Array.isArray(content)) {
+    for (const block of content) {
+      if (block?.type === 'text' && typeof block.text === 'string') {
+        text = block.text;
+        break;
+      }
+    }
+  }
+  if (!text) return false;
+  const trimmed = text.trimStart();
+  return HEARTBEAT_USER_PREFIX_PATTERNS.some((p) => p.test(trimmed));
+}
+
+export function isHeartbeatAssistantText(text: string): boolean {
+  const stripped = text.trim().replace(/^\[\[reply_to[^\]]*\]\]\s*/i, '').trim();
+  return HEARTBEAT_ASSISTANT_TOKENS.has(stripped);
+}
+
 /** Extract the short tool name for character animation decisions */
 export function extractToolName(status: string): string {
   // Reading tools → character reads (looks at screen)
@@ -241,13 +285,23 @@ export function parseOpenClawLine(
             }
           }
         } else if (blocks.some((b) => b.type === 'text')) {
-          // Text-only response — agent is thinking/responding
-          state.lastActivityMs = Date.now();
-          if (state.isIdle) {
-            state.isIdle = false;
-            events.push({ type: 'agentStatus', id: agentId, status: 'active' });
+          // Text-only response — agent is thinking/responding, UNLESS every
+          // text block is a heartbeat reply (HEARTBEAT_OK / NO_REPLY / ...),
+          // in which case we must not resurrect "active" state.
+          const textBlocks = blocks.filter((b) => b.type === 'text') as Array<{
+            type: string;
+            text?: string;
+          }>;
+          const allHeartbeat =
+            textBlocks.length > 0 &&
+            textBlocks.every((b) => typeof b.text === 'string' && isHeartbeatAssistantText(b.text));
+          if (!allHeartbeat) {
+            state.lastActivityMs = Date.now();
+            if (state.isIdle) {
+              state.isIdle = false;
+              events.push({ type: 'agentStatus', id: agentId, status: 'active' });
+            }
           }
-
         }
       } else if (msg.role === 'toolResult') {
         // Tool completed
@@ -282,6 +336,13 @@ export function parseOpenClawLine(
           }
         }
       } else if (msg.role === 'user') {
+        // Heartbeat system messages aren't real user turns — skip them entirely
+        // so they don't reset tool state or re-activate an idle agent.
+        if (isHeartbeatUserContent(msg.content)) {
+          // Intentional no-op: no events, no lastActivityMs bump.
+          return events;
+        }
+
         // New user message — new turn starting
         state.activeToolIds.clear();
         state.activeToolStatuses.clear();
