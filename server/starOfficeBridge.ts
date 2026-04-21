@@ -20,7 +20,7 @@
 
 import type { DashboardEvent } from './openclawParser.js';
 
-export type StarState = 'idle' | 'writing' | 'researching' | 'executing' | 'syncing' | 'error';
+export type StarState = 'idle' | 'writing' | 'researching' | 'executing' | 'syncing' | 'error' | 'thinking';
 
 const WRITING_TOOLS = new Set([
   'read', 'edit', 'write', 'str_replace', 'notebookedit', 'grep', 'glob',
@@ -167,8 +167,10 @@ export class StarOfficeBridge {
     }
 
     if (rt.lastStatus === 'active') {
-      // No tool but active ⇒ agent is composing a text reply.
-      return { state: 'writing', detail: rt.lastTask || rt.lastChat.slice(0, 60) };
+      // No tool but active => agent is composing a text reply / summarizing / designing.
+      // Treat it as "thinking" so the character walks to the poster/brainstorm corner
+      // instead of just sitting at the coding desk.
+      return { state: 'thinking', detail: rt.lastTask || rt.lastChat.slice(0, 60) };
     }
 
     // waiting / idle -> idle
