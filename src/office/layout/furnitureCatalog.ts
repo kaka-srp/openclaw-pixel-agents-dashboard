@@ -1,4 +1,5 @@
 import {
+  BED_SPRITE,
   BOOKSHELF_SPRITE,
   CHAIR_SPRITE,
   COOLER_SPRITE,
@@ -6,6 +7,8 @@ import {
   LAMP_SPRITE,
   PC_SPRITE,
   PLANT_SPRITE,
+  SERVER_RACK_SPRITE,
+  SOFA_SPRITE,
   WHITEBOARD_SPRITE,
 } from '../sprites/spriteData.js';
 import type { FurnitureCatalogEntry, SpriteData } from '../types.js';
@@ -117,6 +120,34 @@ export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
     sprite: LAMP_SPRITE,
     isDesk: false,
     category: 'decor',
+  },
+  // ── PR3+ dedicated workstation furniture ──
+  {
+    type: FurnitureType.SERVER_RACK,
+    label: 'Server Rack',
+    footprintW: 1,
+    footprintH: 2,
+    sprite: SERVER_RACK_SPRITE,
+    isDesk: false,
+    category: 'electronics',
+  },
+  {
+    type: FurnitureType.SOFA,
+    label: 'Sofa',
+    footprintW: 2,
+    footprintH: 1,
+    sprite: SOFA_SPRITE,
+    isDesk: false,
+    category: 'misc',
+  },
+  {
+    type: FurnitureType.BED,
+    label: 'Bed',
+    footprintW: 2,
+    footprintH: 2,
+    sprite: BED_SPRITE,
+    isDesk: false,
+    category: 'misc',
   },
 ];
 

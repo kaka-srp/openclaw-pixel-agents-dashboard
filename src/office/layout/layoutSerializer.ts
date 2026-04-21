@@ -164,12 +164,18 @@ function furnitureTypeToWorkstationKind(type: string): WorkstationKind | null {
       return Wk.WHITEBOARD;
     case FurnitureType.BOOKSHELF:
       return Wk.BOOKSHELF;
-    case FurnitureType.COOLER:
-      return Wk.SOFA; // temporary: cooler stands in for sofa (rest)
     case FurnitureType.PC:
       return Wk.BROWSER;
+    case FurnitureType.SERVER_RACK:
+      return Wk.SERVER_RACK;
+    case FurnitureType.SOFA:
+      return Wk.SOFA;
+    case FurnitureType.BED:
+      return Wk.BED;
+    case FurnitureType.COOLER:
+      return Wk.SOFA; // legacy placeholder (pre-SOFA_SPRITE layouts)
     case FurnitureType.LAMP:
-      return Wk.BED; // temporary: lamp stands in for bed (sleep)
+      return Wk.BED; // legacy placeholder (pre-BED_SPRITE layouts)
     case FurnitureType.DESK:
       return Wk.DESK;
     default:
@@ -374,29 +380,31 @@ export function createDefaultLayout(): OfficeLayout {
   }
 
   // Default layout split into:
-  //   Left room  (c 1-9)   = WORKROOM   (desk / whiteboard / bookshelf / pc)
-  //   Right room (c 11-18) = LOUNGE     (cooler / lamp) — temporary stand-ins for sofa/bed
+  //   Left room  (c 1-9)   = WORKROOM   (desk / whiteboard / bookshelf / pc / server_rack)
+  //   Right room (c 11-18) = LOUNGE     (sofa / bed)
   const furniture: PlacedFurniture[] = [
     // Workroom — left
     { uid: 'desk-left', type: FurnitureType.DESK, col: 4, row: 3 },
     { uid: 'whiteboard-1', type: FurnitureType.WHITEBOARD, col: 4, row: 0 },
     { uid: 'bookshelf-1', type: FurnitureType.BOOKSHELF, col: 1, row: 5 },
-    { uid: 'pc-1', type: FurnitureType.PC, col: 8, row: 5 },
+    { uid: 'pc-1', type: FurnitureType.PC, col: 7, row: 6 },
+    { uid: 'server-rack-1', type: FurnitureType.SERVER_RACK, col: 9, row: 5 },
     { uid: 'plant-left', type: FurnitureType.PLANT, col: 1, row: 1 },
-    // Workroom chairs — tagged by the nearest non-desk workstation they can face
+    // Workroom chairs — tagged by the nearest workstation they face
     { uid: 'chair-whiteboard', type: FurnitureType.CHAIR, col: 5, row: 1 }, // face UP → whiteboard (THINKING)
     { uid: 'chair-desk-left', type: FurnitureType.CHAIR, col: 3, row: 4 }, // face RIGHT → desk (CODING)
     { uid: 'chair-desk-right', type: FurnitureType.CHAIR, col: 6, row: 3 }, // face LEFT → desk (CODING)
     { uid: 'chair-shelf', type: FurnitureType.CHAIR, col: 2, row: 5 }, // face LEFT → bookshelf (MEMORY)
-    { uid: 'chair-pc', type: FurnitureType.CHAIR, col: 8, row: 7 }, // face UP → pc (BROWSING/EXEC)
+    { uid: 'chair-pc', type: FurnitureType.CHAIR, col: 7, row: 8 }, // face UP → pc (BROWSING)
+    { uid: 'chair-server', type: FurnitureType.CHAIR, col: 9, row: 8 }, // face UP → server_rack (EXECUTING)
 
     // Lounge — right
-    { uid: 'cooler-1', type: FurnitureType.COOLER, col: 17, row: 7 },
-    { uid: 'lamp-1', type: FurnitureType.LAMP, col: 12, row: 8 },
+    { uid: 'sofa-1', type: FurnitureType.SOFA, col: 15, row: 7 }, // 2×1: covers (15,7)(16,7)
+    { uid: 'bed-1', type: FurnitureType.BED, col: 12, row: 4 }, // 2×2: covers (12-13, 4-5)
     { uid: 'plant-right', type: FurnitureType.PLANT, col: 18, row: 1 },
-    { uid: 'chair-sofa-1', type: FurnitureType.CHAIR, col: 16, row: 7 }, // face RIGHT → cooler (RESTING)
-    { uid: 'chair-sofa-2', type: FurnitureType.CHAIR, col: 17, row: 8 }, // face UP → cooler (RESTING)
-    { uid: 'chair-bed', type: FurnitureType.CHAIR, col: 12, row: 7 }, // face DOWN → lamp (SLEEPING)
+    { uid: 'chair-sofa-1', type: FurnitureType.CHAIR, col: 15, row: 8 }, // face UP → sofa (RESTING)
+    { uid: 'chair-sofa-2', type: FurnitureType.CHAIR, col: 16, row: 8 }, // face UP → sofa (RESTING)
+    { uid: 'chair-bed', type: FurnitureType.CHAIR, col: 14, row: 4 }, // face LEFT → bed (SLEEPING)
   ];
 
   return { version: 1, cols: DEFAULT_COLS, rows: DEFAULT_ROWS, tiles, tileColors, furniture };

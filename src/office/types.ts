@@ -105,6 +105,10 @@ export const FurnitureType = {
   CHAIR: 'chair',
   PC: 'pc',
   LAMP: 'lamp',
+  // PR3+: dedicated workstation furniture
+  SERVER_RACK: 'server_rack',
+  SOFA: 'sofa',
+  BED: 'bed',
 } as const;
 export type FurnitureType = (typeof FurnitureType)[keyof typeof FurnitureType];
 

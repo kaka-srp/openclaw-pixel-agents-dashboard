@@ -272,6 +272,139 @@ export const LAMP_SPRITE: SpriteData = (() => {
   ]
 })()
 
+/** Sofa: 32x24 (2×1 footprint, top-down) — warm leather-brown three-seater */
+export const SOFA_SPRITE: SpriteData = (() => {
+  const F = '#3D1F10' // frame / outline
+  const D = '#6B3820' // darker cushion
+  const M = '#8B4513' // mid cushion
+  const L = '#B85C3A' // light cushion / top
+  const H = '#CE7652' // highlight
+  const P = '#2D1508' // pillow trim
+  const rows: string[][] = []
+  // Row 0 empty
+  rows.push(new Array(32).fill(_))
+  // Rows 1-3: top backrest (raised, armrests)
+  rows.push([_, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, _])
+  rows.push([_, F, L, L, H, H, L, L, L, L, H, H, L, L, L, L, L, L, H, H, L, L, L, L, L, L, H, H, L, L, F, _])
+  rows.push([_, F, L, H, H, L, L, L, L, L, L, H, H, L, L, L, L, L, L, H, H, L, L, L, L, L, L, H, H, L, F, _])
+  // Rows 4-6: cushion dividers
+  rows.push([_, F, M, M, M, M, F, M, M, M, M, F, M, M, M, M, M, M, M, M, F, M, M, M, M, F, M, M, M, M, F, _])
+  rows.push([_, F, M, D, D, M, F, M, D, D, M, F, M, D, D, M, M, D, D, M, F, M, D, D, M, F, M, D, D, M, F, _])
+  rows.push([_, F, M, D, D, M, F, M, D, D, M, F, M, D, D, M, M, D, D, M, F, M, D, D, M, F, M, D, D, M, F, _])
+  // Rows 7-13: main cushion area (3 seats)
+  for (let r = 0; r < 7; r++) {
+    const even = r % 2 === 0
+    rows.push([
+      _, F,
+      M, D, D, M, F,               // left armrest + cushion
+      M, D, D, D, M, F,            // seat 1
+      M, D, even ? H : D, even ? H : D, D, D, D, M, F, // seat 2
+      M, D, D, D, M, F,            // seat 3
+      M, D, D, M, F,               // right armrest + cushion
+      _,
+    ])
+  }
+  // Row 14: bottom of cushions
+  rows.push([_, F, M, M, M, M, F, M, M, M, M, F, M, M, M, M, M, M, M, M, F, M, M, M, M, F, M, M, M, M, F, _])
+  // Row 15-17: base / seams
+  rows.push([_, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, _])
+  rows.push([_, _, P, P, _, _, _, _, P, P, _, _, _, _, _, _, _, _, _, _, _, _, P, P, _, _, _, _, P, P, _, _])
+  rows.push(new Array(32).fill(_))
+  // Pad to 24 rows
+  for (let r = 0; r < 6; r++) rows.push(new Array(32).fill(_))
+  return rows
+})()
+
+/** Bed: 32x32 (2×2 footprint, top-down) — single bed with pillow + blanket */
+export const BED_SPRITE: SpriteData = (() => {
+  const F = '#4A2D14' // dark wood frame
+  const W = '#8B6914' // mid wood
+  const L = '#A07828' // light wood
+  const P = '#F0F0F5' // pillow
+  const S = '#C7C7D0' // pillow shadow
+  const B = '#A02030' // blanket red
+  const D = '#701020' // blanket dark
+  const H = '#C44050' // blanket highlight
+  const rows: string[][] = []
+  // Row 0: empty
+  rows.push(new Array(32).fill(_))
+  // Rows 1-2: headboard
+  rows.push([_, F, W, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, W, F, _])
+  rows.push([_, F, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, F, _])
+  // Rows 3-8: pillow area
+  rows.push([_, F, W, W, P, P, P, P, P, P, P, P, S, P, P, P, P, P, S, P, P, P, P, P, P, P, P, W, W, W, F, _])
+  rows.push([_, F, W, P, P, P, P, P, S, P, P, P, P, P, P, P, P, P, P, P, P, P, P, S, P, P, P, P, W, W, F, _])
+  rows.push([_, F, W, P, P, P, P, S, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, W, W, F, _])
+  rows.push([_, F, W, P, P, P, P, P, P, P, P, S, P, P, P, P, P, P, P, P, S, P, P, P, P, P, P, P, W, W, F, _])
+  rows.push([_, F, W, W, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, W, W, W, F, _])
+  rows.push([_, F, W, W, W, P, P, P, P, P, S, P, P, P, P, P, P, P, P, P, P, S, P, P, P, P, W, W, W, W, F, _])
+  // Row 9: pillow/blanket divider
+  rows.push([_, F, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, F, _])
+  // Rows 10-23: blanket (14 rows)
+  for (let r = 0; r < 14; r++) {
+    const accent = r % 4 === 0
+    rows.push([
+      _, F, W,
+      B, B, D, B, B, B, accent ? H : B, B, B, D, B, B, B, B, B, B, B, B, D, B, B, B, accent ? H : B, B, B, D, B, B,
+      W, F, _,
+    ])
+  }
+  // Row 24: bottom frame
+  rows.push([_, F, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, F, _])
+  rows.push([_, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, _])
+  // Pad to 32
+  for (let r = 0; r < 5; r++) rows.push(new Array(32).fill(_))
+  return rows
+})()
+
+/** Server rack: 16x32 (1×2 footprint, top-down front) — status LEDs + rackmount units */
+export const SERVER_RACK_SPRITE: SpriteData = (() => {
+  const F = '#1A1A1E' // frame
+  const B = '#2A2A30' // rack body
+  const D = '#3A3A44' // unit panel
+  const S = '#55555F' // panel highlight
+  const G = '#44FF66' // green LED
+  const R = '#FF4444' // red LED
+  const Y = '#FFCC44' // amber LED
+  const C = '#6699CC' // screen cyan
+  const W = '#EEEEEE' // light
+  const rows: string[][] = []
+  // Top cap
+  rows.push(new Array(16).fill(_))
+  rows.push([_, F, F, F, F, F, F, F, F, F, F, F, F, F, F, _])
+  rows.push([_, F, B, B, B, B, B, B, B, B, B, B, B, B, F, _])
+  // Top display panel with readouts
+  rows.push([_, F, B, D, D, D, D, D, D, D, D, D, D, B, F, _])
+  rows.push([_, F, B, D, C, C, C, C, C, C, C, C, D, B, F, _])
+  rows.push([_, F, B, D, C, W, W, _, _, W, W, W, D, B, F, _])
+  rows.push([_, F, B, D, C, C, C, C, C, C, C, C, D, B, F, _])
+  rows.push([_, F, B, B, B, B, B, B, B, B, B, B, B, B, F, _])
+  // 4 rackmount units, each 3 rows tall, separated by 1-row seams
+  const unitRow = (ledA: string, ledB: string, ledC: string) => [
+    [_, F, B, D, D, D, S, S, S, S, D, D, D, B, F, _],
+    [_, F, B, D, ledA, ledB, S, D, D, S, S, D, ledC, B, F, _],
+    [_, F, B, D, D, D, D, D, D, D, D, D, D, B, F, _],
+  ]
+  const seam = [_, F, B, B, B, B, B, B, B, B, B, B, B, B, F, _]
+  const u1 = unitRow(G, G, Y)
+  for (const r of u1) rows.push(r)
+  rows.push(seam)
+  const u2 = unitRow(G, Y, G)
+  for (const r of u2) rows.push(r)
+  rows.push(seam)
+  const u3 = unitRow(R, G, G)
+  for (const r of u3) rows.push(r)
+  rows.push(seam)
+  const u4 = unitRow(G, G, G)
+  for (const r of u4) rows.push(r)
+  // Bottom cap
+  rows.push([_, F, B, B, B, B, B, B, B, B, B, B, B, B, F, _])
+  rows.push([_, F, F, F, F, F, F, F, F, F, F, F, F, F, F, _])
+  // Pad to 32 if needed
+  while (rows.length < 32) rows.push(new Array(16).fill(_))
+  return rows.slice(0, 32)
+})()
+
 // ── Speech Bubble Sprites ───────────────────────────────────────
 
 /** Permission bubble: white square with "..." in amber, and a tail pointer (11x13) */
