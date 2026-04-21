@@ -22,6 +22,7 @@ import { getServiceStatuses, controlService, restartService } from './services.j
 import { getVersionInfo, getSolaraVersionInfo, runUpdate, runSolaraUpdate } from './version.js';
 import type { DashboardEvent } from './openclawParser.js';
 import { SessionWatcher } from './sessionWatcher.js';
+import { StarOfficeBridge } from './starOfficeBridge.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -85,9 +86,31 @@ function broadcast(event: DashboardEvent): void {
 // Load sprites at startup (once)
 const sprites = loadAllSprites();
 
+// ── Optional: Star Office UI bridge ─────────────────────────
+// Set STAR_OFFICE_URL (e.g. http://127.0.0.1:19000) to also push
+// derived agent state to a Star Office UI backend via POST /set_state.
+const starOfficeUrl = process.env.STAR_OFFICE_URL || '';
+const starOfficeFocusAgentRaw = process.env.STAR_OFFICE_FOCUS_AGENT_ID;
+const starOfficeFocusAgent = starOfficeFocusAgentRaw
+  ? Number(starOfficeFocusAgentRaw)
+  : undefined;
+const starBridge = starOfficeUrl
+  ? new StarOfficeBridge({
+      url: starOfficeUrl,
+      focusAgentId: Number.isFinite(starOfficeFocusAgent) ? starOfficeFocusAgent : undefined,
+    })
+  : null;
+if (starBridge) {
+  console.log(
+    `[StarBridge] enabled → ${starOfficeUrl}` +
+      (starOfficeFocusAgent !== undefined ? ` (focus agentId=${starOfficeFocusAgent})` : ''),
+  );
+}
+
 // Session watcher — tails JSONL files and emits events
 const watcher = new SessionWatcher(AGENTS, (event) => {
   broadcast(event);
+  if (starBridge) starBridge.handleEvent(event);
 });
 
 // WebSocket connection handling
