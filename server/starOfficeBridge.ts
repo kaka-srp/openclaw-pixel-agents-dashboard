@@ -27,13 +27,22 @@ const WRITING_TOOLS = new Set([
 ]);
 const EXECUTING_TOOLS = new Set([
   'exec', 'bash', 'shell', 'run', 'command',
+  'process', // openclaw background-process poll/log — pairs with exec
 ]);
 const RESEARCHING_TOOLS = new Set([
   'web_fetch', 'webfetch', 'websearch', 'web_search', 'browser', 'fetch',
   'memory_search', 'memory_get', 'memory', 'recall',
+  'pdf', 'image', // media/doc analysis
 ]);
 const SYNCING_TOOLS = new Set([
   'sessions_spawn', 'task', 'agent', 'delegate',
+  'message',   // openclaw IM push (feishu/telegram/etc)
+  'gateway',   // openclaw config.get/patch system sync
+  'sessions_send', 'channel_post', 'notify', 'announce',
+]);
+const THINKING_TOOLS = new Set([
+  'update_plan', // openclaw plan/explanation updates — pure metacognition
+  'think', 'plan', 'design', 'summary',
 ]);
 
 function toolNameToStarState(toolName: string): StarState {
@@ -42,6 +51,7 @@ function toolNameToStarState(toolName: string): StarState {
   if (EXECUTING_TOOLS.has(t)) return 'executing';
   if (RESEARCHING_TOOLS.has(t)) return 'researching';
   if (SYNCING_TOOLS.has(t)) return 'syncing';
+  if (THINKING_TOOLS.has(t)) return 'thinking';
   // Unknown tools: treat as writing (safer than idle — they ARE working)
   return 'writing';
 }
